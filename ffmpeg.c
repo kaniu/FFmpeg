@@ -383,6 +383,7 @@ static int read_key(void)
     }
 #elif HAVE_KBHIT
 #    if HAVE_PEEKNAMEDPIPE
+#        ifndef _MSC_VER
     static int is_pipe;
     static HANDLE input_handle;
     DWORD dw, nchars;
@@ -409,6 +410,7 @@ static int read_key(void)
             return -1;
         }
     }
+#        endif
 #    endif
     if(kbhit())
         return(getch());
