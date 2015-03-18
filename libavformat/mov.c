@@ -2600,7 +2600,7 @@ static int mov_open_dref(AVIOContext **pb, const char *src, MOVDref *ref,
     /* try relative path, we do not try the absolute because it can leak information about our
        system to an attacker */
     if (ref->nlvl_to > 0 && ref->nlvl_from > 0) {
-        char filename[1024];
+        char filename[1025];
         const char *src_path;
         int i, l;
 
@@ -2626,10 +2626,15 @@ static int mov_open_dref(AVIOContext **pb, const char *src, MOVDref *ref,
             filename[src_path - src] = 0;
 
             for (i = 1; i < ref->nlvl_from; i++)
-                av_strlcat(filename, "../", 1024);
+                av_strlcat(filename, "../", sizeof(filename));
 
-            av_strlcat(filename, ref->path + l + 1, 1024);
+            av_strlcat(filename, ref->path + l + 1, sizeof(filename));
+            if (!use_absolute_path)
+                if(strstr(ref->path + l + 1, "..") || ref->nlvl_from > 1)
+                    return AVERROR(ENOENT);
 
+            if (strlen(filename) + 1 == sizeof(filename))
+                return AVERROR(ENOENT);
             if (!avio_open2(pb, filename, AVIO_FLAG_READ, int_cb, NULL))
                 return 0;
         }
@@ -3659,7 +3664,9 @@ static int mov_probe(AVProbeData *p)
                  AV_RB64(p->buf+offset + 8) == 0)) {
                 score = FFMAX(score, AVPROBE_SCORE_EXTENSION);
             } else if (tag == MKTAG('f','t','y','p') &&
-                       AV_RL32(p->buf + offset + 8) == MKTAG('j','p','2',' ')) {
+                       (   AV_RL32(p->buf + offset + 8) == MKTAG('j','p','2',' ')
+                        || AV_RL32(p->buf + offset + 8) == MKTAG('j','p','x',' ')
+                    )) {
                 score = FFMAX(score, 5);
             } else {
                 score = AVPROBE_SCORE_MAX;
